@@ -6,25 +6,26 @@
 
 ## 📌 Project Overview
 
-CampusCart is an online marketplace where students can browse products, add them to a cart, and place orders. An admin account can manage all products directly from a dedicated admin panel — all data is stored in a MySQL database.
+CampusCart is an online marketplace where students can browse products, add them to a cart, and place orders. 
+It features a **comprehensive Admin Dashboard** that allows full CRUD operations (**Create, Read, Update, Delete**) directly on **all 4 database tables** (`Products`, `Users`, `Orders`, and `OrderItems`) with foreign-key safe handling and transactions.
 
 ---
 
-## 👥 Team Members
+## 👥 Team Members & Roles
 
-| Name          | Role                                      |
-|---------------|-------------------------------------------|
-| SHIVRAJ SINGH DEORA | Full Stack Lead & Backend Developer       |
-| Garvit Choudhary      | Database Designer                         |
-| Member 3      | Frontend Developer                        |
-| Member 4      | UI/UX Designer                            |
-| Member 5      | Security & Admin Module                   |
+| Name | Role | Responsibilities |
+|------|------|------------------|
+| Shivraj Singh Deora | **Full Stack Lead & Backend Developer** | Express architecture, MySQL2 pooling, REST API endpoints, routing |
+| Garvit Chaudhary | **Database Designer** | MySQL schema design, relational integrity (PK/FK), transactions & seeding |
+| Naman Mangla | **Frontend Developer** | React pages (Home, Products, Cart, Orders), Context API, Axios integration |
+| Aman Yadav | **UI/UX Designer** | Black & White glassmorphism aesthetic, responsive layout, modal dialogs |
+| Tejas Srivatsava | **Security & Admin Module** | JWT token management, bcrypt password hashing, 4-table Admin CRUD panel |
 
 ---
 
 ## 🗄️ Database Schema (MySQL)
 
-We follow the exact schema given in the assignment:
+Designed strictly according to the relational schema requirements:
 
 ```sql
 Users       (user_id PK, username, email, password, phone)
@@ -33,303 +34,258 @@ Orders      (order_id PK, user_id FK → Users, order_date, total_amount)
 OrderItems  (order_item_id PK, order_id FK → Orders, product_id FK → Products, quantity, price)
 ```
 
-### Relationships
-- One **User** can place many **Orders**
-- One **Order** can have many **OrderItems**
-- Each **OrderItem** links to one **Product**
+### Relational Mapping
+- **Users ➔ Orders** (1 : N): One user can create multiple orders.
+- **Orders ➔ OrderItems** (1 : N): An order contains multiple line items.
+- **Products ➔ OrderItems** (1 : N): A product can appear across multiple order line items.
 
 ---
 
 ## 🧰 Tech Stack
 
-### Frontend (CampusCart/)
+### Frontend (`CampusCart/`)
 | Technology | Purpose |
 |-----------|---------|
-| **React 19** | UI framework — builds the pages as components |
-| **React Router DOM** | Navigation between pages without page reload |
-| **Tailwind CSS v4** | Utility-first CSS for styling |
-| **Lucide React** | Icon library (cart, trash, pencil, etc.) |
-| **Axios** | Makes HTTP requests from browser to server |
-| **React Hot Toast** | Shows success/error notification popups |
+| **React 19** | Component-driven user interface |
+| **React Router DOM v7** | Client-side routing with clean URL navigation |
+| **Tailwind CSS v4** | Modern styling engine with glassmorphic variables |
+| **Lucide React** | Minimalist modern icons |
+| **Axios** | HTTP client configured with cookie credentials |
+| **React Hot Toast** | Toast notifications for DB operations and user alerts |
 
-### Backend (Server/)
+### Backend (`Server/`)
 | Technology | Purpose |
 |-----------|---------|
-| **Node.js** | JavaScript runtime on the server |
-| **Express.js** | Web framework — handles API routes |
-| **mysql2** | Connects Node.js to the MySQL database |
-| **bcrypt** | Hashes passwords before storing (security) |
-| **jsonwebtoken (JWT)** | Creates login tokens — keeps users logged in |
-| **cookie-parser** | Reads JWT token stored in browser cookie |
-| **dotenv** | Loads secret config from `.env` file |
-| **cors** | Allows frontend (port 5173) to talk to backend (port 8080) |
+| **Node.js & Express.js** | Backend API runtime and routing framework |
+| **mysql2 (Promise Pool)** | High-performance asynchronous MySQL connector |
+| **bcrypt** | Salted hashing algorithm for user passwords |
+| **jsonwebtoken (JWT)** | Token-based stateless authentication stored in HTTP-only cookies |
+| **cookie-parser** | Parsing credentials and tokens from request headers |
+| **dotenv** | Environment-based configuration management |
+| **cors** | Cross-Origin Resource Sharing control |
 
 ---
 
-## 🔐 Authentication Flow (JWT + bcrypt)
+## 🔐 Authentication & Security Architecture
 
-This is how login/signup works securely:
-
-```
-SIGNUP:
-  User fills form → POST /auth/signup
-  → Server hashes password with bcrypt (12 salt rounds)
-  → Saves hashed password to MySQL Users table
-  → Creates a JWT token
-  → Sends token as httpOnly cookie to browser
-
-LOGIN:
-  User enters email + password → POST /auth/login
-  → Server fetches user from MySQL by email
-  → bcrypt.compare(entered password, stored hash)
-  → If match → creates JWT token → sends as cookie
-
-EVERY PROTECTED REQUEST:
-  Browser automatically sends cookie
-  → Server middleware (authMiddleware.js) verifies JWT
-  → If valid → allows access, if not → 401 Unauthorized
-```
-
-> **Why bcrypt?** Plain text passwords are dangerous. bcrypt turns "admin" into something like `$2b$12$6AT4TcRF...` which cannot be reversed.
-
-> **Why JWT?** Instead of checking the database on every request, a signed token proves who the user is without a DB lookup.
+1. **Password Hashing (bcrypt)**:
+   - When a user or admin registers/adds an account, the plaintext password is processed through **12 salt rounds**. Plaintext passwords are never persisted in the database.
+2. **Stateless JWT Authorization**:
+   - On login, a signed JSON Web Token containing the user's ID, email, and username is generated.
+   - It is transmitted via an `httpOnly`, `sameSite: strict` cookie, protecting against cross-site scripting (XSS) and token theft.
+3. **Role-Based Admin Protection**:
+   - Protected routes and the `/admin` interface enforce server-side validation:
+     ```javascript
+     if (req.user?.email !== 'admin@gmail.com') {
+       return res.status(403).json({ message: 'Admin access required' });
+     }
+     ```
+4. **Database Transactions**:
+   - Order placement and order deletion execute within explicit `START TRANSACTION`, `COMMIT`, and `ROLLBACK` blocks to maintain ACID compliance.
 
 ---
 
-## 🗂️ Project Structure
+## 🗂️ Project Directory Structure
 
 ```
 Project/
 │
-├── Server/                   ← Node.js + Express backend
-│   ├── index.js              ← App entry point, starts server on port 8080
-│   ├── db.js                 ← MySQL connection pool (mysql2)
-│   ├── .env                  ← Secret config (DB password, JWT secret)
-│   ├── schema.sql            ← Run this in MySQL Workbench to create tables
-│   ├── seed-admin.js         ← Run once to create admin@gmail.com account
-│   ├── middleware/
-│   │   └── authMiddleware.js ← JWT verification for protected routes
-│   └── routes/
-│       ├── auth.js           ← /auth/signup, /auth/login, /auth/logout, /auth/me
-│       ├── products.js       ← /products (GET, POST, PUT, DELETE)
-│       └── orders.js         ← /orders (GET, POST)
+├── README.md                 ← Project documentation & presentation guide
 │
-└── CampusCart/               ← React frontend
+├── Server/                   ← Backend API (Node.js + Express)
+│   ├── index.js              ← Main server setup & route registration
+│   ├── db.js                 ← MySQL connection pool configuration
+│   ├── .env                  ← Environment variables (DB credentials, JWT secret)
+│   ├── schema.sql            ← DDL script with seed data
+│   ├── seed-admin.js         ← One-step script to seed admin@gmail.com
+│   ├── middleware/
+│   │   └── authMiddleware.js ← JWT verification middleware
+│   └── routes/
+│       ├── auth.js           ← User signup, login, logout, session check
+│       ├── products.js       ← Storefront products API
+│       ├── orders.js         ← Storefront orders API & transaction placement
+│       └── admin.js          ← Dedicated CRUD endpoints for ALL 4 tables
+│
+└── CampusCart/               ← Frontend (React + Vite + Tailwind)
     └── src/
-        ├── main.jsx          ← React app entry point
-        ├── App.jsx           ← All routes defined here
-        ├── Navbar.jsx        ← Top navigation bar
-        ├── index.css         ← Global styles + glass effect CSS
+        ├── main.jsx          ← React entry point
+        ├── App.jsx           ← Application routing
+        ├── Navbar.jsx        ← Glassmorphic navigation bar with role badges
+        ├── index.css         ← Global design tokens and glass utility classes
         ├── lib/
-        │   ├── api.js        ← Axios instance (base URL + cookies)
-        │   └── utils.js      ← cn() class merge utility
+        │   ├── api.js        ← Centralized Axios instance with baseUrl and credentials
+        │   └── utils.js      ← Class utility helpers
         ├── context/
-        │   ├── AuthContext.jsx  ← Manages logged-in user state globally
-        │   └── CartContext.jsx  ← Manages cart state + localStorage
+        │   ├── AuthContext.jsx  ← Authentication state provider (user, admin status)
+        │   └── CartContext.jsx  ← Shopping cart state (with localStorage persistence)
         └── pages/
-            ├── Home.jsx      ← Landing page with featured products
-            ├── Login.jsx     ← Login form
-            ├── Signup.jsx    ← Registration form
-            ├── Products.jsx  ← Browse all products with search + filter
-            ├── Cart.jsx      ← Shopping cart + checkout
-            ├── Orders.jsx    ← Order history for logged-in user
-            └── Admin.jsx     ← Admin panel (add/edit/delete products)
+            ├── Home.jsx      ← Hero page & featured products
+            ├── Login.jsx     ← User & Admin sign in
+            ├── Signup.jsx    ← User account registration
+            ├── Products.jsx  ← Searchable & filterable catalogue
+            ├── Cart.jsx      ← Cart management & checkout
+            ├── Orders.jsx    ← Personal purchase history
+            └── Admin.jsx     ← Full CRUD multi-tab dashboard for all 4 tables
 ```
 
 ---
 
-## 🖥️ Pages & Features
+## 🖥️ Application Features & SQL Mapping
 
-### 🏠 Home Page (`/`)
-- Shows a hero banner with "Shop Now" button
-- Displays 6 featured products fetched from MySQL
-- Each product card has an **Add to Cart** button
+### 1. Storefront
 
-### 🛍️ Products Page (`/products`)
-- Fetches **all products** from MySQL (`SELECT * FROM Products`)
-- **Search bar** — filters by product name using `LIKE %keyword%`
-- **Category dropdown** — filters by category
-- Every card shows: name, category, price, stock count
-- **Add to Cart** button — adds item to cart (stored in localStorage)
-
-### 🔐 Login Page (`/login`)
-- Takes email and password
-- Calls `POST /auth/login` → server checks bcrypt hash → returns JWT cookie
-- On success, redirects to Home
-
-### 📝 Signup Page (`/signup`)
-- Takes username, email, phone, password
-- Calls `POST /auth/signup` → server hashes password → saves to MySQL → returns JWT cookie
-- Logged in automatically after signup
-
-### 🛒 Cart Page (`/cart`)
-- Shows all items added to cart (saved in browser localStorage)
-- **`+` / `−` buttons** — increase or decrease quantity
-- **🗑️ Delete button** — removes item from cart
-- Shows running total price
-- **"Place Order" button**:
-  1. Calls `POST /orders` with item list
-  2. Server validates stock in MySQL
-  3. Server creates row in `Orders` table
-  4. Server creates rows in `OrderItems` table
-  5. Server decrements `stock_quantity` in `Products` table
-  6. All in a **MySQL Transaction** (if anything fails, everything rolls back)
-
-### 📦 Orders Page (`/orders`)
-- Only visible when logged in (redirects to login otherwise)
-- Calls `GET /orders` → server fetches from MySQL with JOIN:
+- **Home (`/`)**: Displays curated product catalog fetched with `SELECT * FROM Products LIMIT 6`.
+- **Products Catalog (`/products`)**: Dynamic search and filtering using SQL queries:
   ```sql
-  SELECT oi.*, p.product_name, p.category
-  FROM OrderItems oi
-  JOIN Products p ON oi.product_id = p.product_id
-  WHERE oi.order_id = ?
+  SELECT * FROM Products WHERE category = ? AND product_name LIKE ? ORDER BY product_id DESC;
   ```
-- Shows each order with date, total, and all items inside
-
-### 🛡️ Admin Page (`/admin`)
-- **Only accessible when logged in as `admin@gmail.com`**
-- Anyone else is redirected away immediately
-- Shows all products in a table with live stats
-
-#### Admin Buttons — What MySQL query runs:
-
-| Button | MySQL Query |
-|--------|-------------|
-| **➕ Add Product** | `INSERT INTO Products (product_name, category, price, stock_quantity) VALUES (?, ?, ?, ?)` |
-| **✏️ Edit** | `UPDATE Products SET product_name=?, category=?, price=?, stock_quantity=? WHERE product_id=?` |
-| **🗑️ Delete** | `DELETE FROM Products WHERE product_id=?` *(if product has orders, sets stock=0 instead)* |
-
-After every operation the table **re-fetches from MySQL** to show live data.
+- **Cart & Checkout (`/cart`)**: 
+  - Validates stock in `Products`.
+  - Atomically creates `Orders`, inserts into `OrderItems`, and decrements `stock_quantity` in `Products` using a MySQL transaction.
+- **Order History (`/orders`)**: Fetches customer orders linked with product details using `JOIN`:
+  ```sql
+  SELECT oi.*, p.product_name, p.category 
+  FROM OrderItems oi 
+  JOIN Products p ON oi.product_id = p.product_id 
+  WHERE oi.order_id = ?;
+  ```
 
 ---
 
-## 🔒 Security Features
+### 2. Full Admin Dashboard (`/admin`)
 
-| Feature | How it works |
-|---------|-------------|
-| **Password Hashing** | bcrypt with 12 salt rounds — cannot be reversed |
-| **JWT Tokens** | Signed with secret key, expire in 7 days |
-| **httpOnly Cookie** | Token stored in cookie JavaScript cannot read — prevents XSS |
-| **Server-side Admin Guard** | Every admin route checks `req.user.email === 'admin@gmail.com'` |
-| **MySQL Transactions** | Order placement is atomic — partial orders never saved |
-| **Stock Validation** | Server checks stock before creating order |
+The Admin Panel features a **Tabbed Interface** allowing management of **every single table** in the schema:
 
----
-
-## ⚙️ How to Run
-
-### Step 1 — Setup MySQL Database
-Open MySQL Workbench and run `Server/schema.sql`:
-```sql
--- Creates database, all 4 tables, and seeds 12 sample products
+```
+[ 📦 Products ]  [ 👤 Users ]  [ 🧾 Orders ]  [ 📋 Order Items ]
 ```
 
-### Step 2 — Configure Environment
-Edit `Server/.env`:
+#### A. 📦 Products Management
+- **Add**: Opens dialog $\rightarrow$ `INSERT INTO Products (product_name, category, price, stock_quantity) VALUES (?, ?, ?, ?)`
+- **Edit**: Updates fields $\rightarrow$ `UPDATE Products SET product_name=?, category=?, price=?, stock_quantity=? WHERE product_id=?`
+- **Delete**: Foreign-key safe $\rightarrow$ If product has orders, marks stock as 0; otherwise runs `DELETE FROM Products WHERE product_id=?`.
+
+#### B. 👤 Users Management
+- **Add**: Hashes password with bcrypt $\rightarrow$ `INSERT INTO Users (username, email, password, phone) VALUES (?, ?, ?, ?)`
+- **Edit**: Updates user details $\rightarrow$ `UPDATE Users SET username=?, email=?, phone=? WHERE user_id=?` (optionally updates password if provided)
+- **Delete**: Prevents deleting active admin and checks for existing orders $\rightarrow$ `DELETE FROM Users WHERE user_id=?`.
+
+#### C. 🧾 Orders Management
+- **Add**: Manually creates orders $\rightarrow$ `INSERT INTO Orders (user_id, order_date, total_amount) VALUES (?, NOW(), ?)`
+- **Edit**: Updates buyer or total $\rightarrow$ `UPDATE Orders SET user_id=?, total_amount=? WHERE order_id=?`
+- **Delete**: Uses a transaction to remove related items first, then the order:
+  ```sql
+  DELETE FROM OrderItems WHERE order_id = ?;
+  DELETE FROM Orders WHERE order_id = ?;
+  ```
+
+#### D. 📋 Order Items Management
+- **Add**: Adds line item $\rightarrow$ `INSERT INTO OrderItems (order_id, product_id, quantity, price) VALUES (?, ?, ?, ?)`
+- **Edit**: Modifies quantities/price $\rightarrow$ `UPDATE OrderItems SET order_id=?, product_id=?, quantity=?, price=? WHERE order_item_id=?`
+- **Delete**: Removes single item $\rightarrow$ `DELETE FROM OrderItems WHERE order_item_id=?`
+
+---
+
+## 🌐 API Route Reference
+
+### Storefront & Auth Endpoints
+| Method | Endpoint | Description | Access |
+|---|---|---|---|
+| POST | `/auth/signup` | Register new user account | Public |
+| POST | `/auth/login` | Authenticate user & issue JWT | Public |
+| POST | `/auth/logout` | Clear JWT auth cookie | Public |
+| GET | `/auth/me` | Fetch active session details | Authenticated |
+| GET | `/products` | List & filter products | Public |
+| GET | `/products/categories` | Distinct categories list | Public |
+| GET | `/orders` | Logged-in user's order history | Authenticated |
+| POST | `/orders` | Place order (transaction) | Authenticated |
+
+### Admin Table CRUD Endpoints (`/admin/*`)
+| Table | Method | Endpoint | Description |
+|---|---|---|---|
+| **Users** | `GET` | `/admin/users` | List all registered users |
+| | `POST` | `/admin/users` | Create new user (hashed password) |
+| | `PUT` | `/admin/users/:id` | Update user credentials or details |
+| | `DELETE` | `/admin/users/:id` | Delete user (FK-safe check) |
+| **Orders** | `GET` | `/admin/orders` | View all customer orders with user joins |
+| | `POST` | `/admin/orders` | Manually insert new order record |
+| | `PUT` | `/admin/orders/:id` | Edit order user or total amount |
+| | `DELETE` | `/admin/orders/:id` | Cascade delete order & its line items |
+| **OrderItems**| `GET` | `/admin/orderitems` | View all items joined with product names |
+| | `POST` | `/admin/orderitems` | Insert item into an order |
+| | `PUT` | `/admin/orderitems/:id` | Update item quantity or unit price |
+| | `DELETE` | `/admin/orderitems/:id` | Remove item line from order |
+| **Products** | `POST` | `/products` | Admin create product |
+| | `PUT` | `/products/:id` | Admin update product |
+| | `DELETE` | `/products/:id` | Admin delete product |
+
+---
+
+## 🚀 Setup & Execution Guide
+
+### 1. Database Initialization
+1. Start your local MySQL server.
+2. In MySQL Workbench or MySQL CLI, run the `Server/schema.sql` script:
+   ```bash
+   mysql -u root -p < Server/schema.sql
+   ```
+
+### 2. Configure Environment Variables
+Inside `Server/.env`:
 ```env
+PORT=8080
+CLIENT_URL=http://localhost:5173
+
 DB_HOST=localhost
 DB_USER=root
-DB_PASSWORD="YourMySQLPassword"   ← wrap in quotes if it has special chars like #
+DB_PASSWORD="YourMySQLPassword"
 DB_NAME=ecommerce_db
-JWT_SECRET=supersecretjwtkey_changeme_in_production
-```
 
-### Step 3 — Create Admin Account
+JWT_SECRET=supersecretjwtkey_changeme_in_production
+JWT_EXPIRES_IN=7d
+```
+> **Tip:** If your MySQL password contains special characters like `#`, make sure it is enclosed in double quotes (`"..."`).
+
+### 3. Seed Admin Credentials
+Run the dedicated seeding script:
 ```bash
 cd Server
 node seed-admin.js
 ```
-This inserts `admin@gmail.com` with bcrypt-hashed password `admin` into MySQL.
+This ensures an admin record exists in the database with the properly salted bcrypt hash.
 
-### Step 4 — Start the Server
+### 4. Run the Backend API
 ```bash
 cd Server
-npm run dev        ← runs with nodemon (auto-restarts on changes)
+npm run dev
 ```
-Server runs at: `http://localhost:8080`
+*API runs at:* `http://localhost:8080`
 
-### Step 5 — Start the Frontend
+### 5. Run the Frontend Client
+In a separate terminal:
 ```bash
 cd CampusCart
 npm run dev
 ```
-Frontend runs at: `http://localhost:5173`
+*Application runs at:* `http://localhost:5173`
 
 ---
 
-## 👤 Test Accounts
+## 🔑 Default Credentials
 
-| Role | Email | Password |
-|------|-------|----------|
-| **Admin** | admin@gmail.com | admin |
-| **Regular User** | Sign up from the website | your choice |
-
----
-
-## 🌐 API Endpoints
-
-### Auth Routes
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/auth/signup` | Register new user | No |
-| POST | `/auth/login` | Login, receive JWT cookie | No |
-| POST | `/auth/logout` | Clear cookie | No |
-| GET | `/auth/me` | Get logged-in user info | ✅ Yes |
-
-### Product Routes
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| GET | `/products` | List all products (search, filter) | No |
-| GET | `/products/categories` | List all unique categories | No |
-| GET | `/products/:id` | Get single product | No |
-| POST | `/products` | Add new product | ✅ Admin only |
-| PUT | `/products/:id` | Update product | ✅ Admin only |
-| DELETE | `/products/:id` | Delete product | ✅ Admin only |
-
-### Order Routes
-| Method | Endpoint | Description | Auth Required |
-|--------|----------|-------------|---------------|
-| POST | `/orders` | Place a new order | ✅ Yes |
-| GET | `/orders` | Get user's order history | ✅ Yes |
-| GET | `/orders/:id` | Get single order details | ✅ Yes |
+| Portal / Role | Email | Password |
+|---|---|---|
+| **Admin Panel** | `admin@gmail.com` | `admin` |
+| **Customer Storefront** | Register via `/signup` or use existing seeded accounts | Defined at registration |
 
 ---
 
-## 🎨 UI Design
+## 🎨 Visual Design Guidelines
 
-- **Color theme:** Strict black and white
-- **Effect:** Glass morphism (`backdrop-blur`, semi-transparent backgrounds)
-- **Background:** `#0a0a0a` (near black)
-- **Cards:** `rgba(255,255,255,0.05)` with `blur(16px)` — glass look
-- **Buttons:** White = primary action, Outlined = secondary, Red = delete
+- **Palette**: Monochromatic High Contrast (Pure Black `#0a0a0a` & Clean White `#ffffff`).
+- **Surface**: Frosted glassmorphism using `backdrop-filter: blur(16px)` and translucent borders (`rgba(255, 255, 255, 0.1)`).
+- **Feedback**: Color-accented status badges (Stock: Green/Yellow/Red; Actions: Danger alert tones for deletions).
 
 ---
 
-## 📊 How Data Flows
-
-```
-Browser (React)
-     │
-     │  HTTP Request (Axios + JWT cookie)
-     ▼
-Express Server (Node.js) — port 8080
-     │
-     ├── authMiddleware.js   →  verifies JWT token
-     ├── routes/auth.js      →  bcrypt + JWT logic
-     ├── routes/products.js  →  CRUD queries
-     └── routes/orders.js    →  transaction queries
-          │
-          │  mysql2 driver
-          ▼
-    MySQL Database (ecommerce_db)
-    ┌──────────┐     ┌────────────┐
-    │  Users   │     │  Products  │
-    └──────────┘     └────────────┘
-    ┌──────────┐     ┌────────────┐
-    │  Orders  │────▶│ OrderItems │
-    └──────────┘     └────────────┘
-```
-
----
-
-*Built for DBMS Lab Project — using mysql2 + Express + React*
+*Prepared for DBMS Lab Project Presentation & Viva Assessment.*

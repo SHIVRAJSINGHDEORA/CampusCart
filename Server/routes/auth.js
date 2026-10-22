@@ -74,6 +74,7 @@ router.post("/login", async (req, res) => {
 
     const user = rows[0];
     const isMatch = await bcrypt.compare(password, user.password);
+    
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid email or password" });
     }
@@ -113,10 +114,11 @@ router.post("/logout", (req, res) => {
 
 // GET /auth/me — protected route
 router.get("/me", verifyToken, async (req, res) => {
+  const useId = req.user.userId;
   try {
     const [rows] = await pool.query(
       "SELECT user_id, username, email, phone FROM Users WHERE user_id = ?",
-      [req.user.userId],
+      [useId],
     );
     if (rows.length === 0)
       return res.status(404).json({ message: "User not found" });
